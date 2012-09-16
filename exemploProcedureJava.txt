@@ -1,0 +1,91 @@
+    public  String openCall(CF2CallVO itemCall,long procAlarmId){
+		
+    	Connection conn           = null;
+    	PreparedStatement preStmt = null;
+    	CallableStatement cs      = null;
+        String numChamado = "";
+        
+        try
+        {
+        	conn = ConnectionPoolFacade.getConnection(OraAutomidiaDAO.DATASOURCE_AUTOMIDIA);
+        	try{
+	            String strSQL = "alter session set nls_date_format = 'yyyy/mm/dd hh24:mi:ss'";
+	            preStmt = conn.prepareStatement(strSQL);
+	            preStmt.execute();
+	            
+        	}catch(Exception e){
+        		CF2Logger.error("[Exception] Ocorreu um erro com o comando \"alter session\". ProcAlarmId: "+procAlarmId,e);
+        	}finally{
+        		if(preStmt != null){
+        			preStmt.close();
+        		}
+        	}
+            
+            String strCmd = "{call ADMAHD30.spr_AutoReq(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)}";
+            cs = conn.prepareCall(strCmd);
+            
+            cs.registerOutParameter(1, java.sql.Types.NUMERIC);//[0]:Indica falha na abertura; [1]:Indica sucesso na abertura;
+            cs.registerOutParameter(3, java.sql.Types.VARCHAR);//Número do chamado. Se for omitido é gerado um número automaticamente.
+            cs.setInt(2, 0); // Notificacao da abertura do chamado=>Permite que o analista responsavel pelo chamado receba uma notificação de abertura do chamado.
+            cs.setString(3, null); // Numero do chamado
+            cs.setDate(4, null); // Data de abertura=>Se for omitido é assumido a data atual.
+            cs.setString(5, itemCall.getClient()/*G0011023*/); // Client=>ID do cliente solicitante do chamado. Este parâmentro é obrigatório.
+            cs.setString(6, itemCall.getOriganal()/*"Samuel Damito"*/); // Origanal=>ID do analista que abriu o chamado. Este parâmentro é obrigatório. 
+            cs.setString(7, itemCall.getCurranal()); // Curranal -pegar da tela=>ID do analista ou grupo responsável pelo chamado. Este parâmentro é obrigatório.
+            cs.setInt(8, itemCall.getAnalGRP());  // [0]:Indica que o responsável é um analista; [1]:Indica que o responsável é um grupo;
+            cs.setString(9, itemCall.getCategory()); // Category do chamado  - pegar do HD =>Categoria do chamado. Este parâmentro é obrigatório.
+            cs.setString(10,itemCall.getProduct()); // Product do chamado - pegar pelo HD
+            cs.setString(11,itemCall.getProcess()); // Process do chamado - pegar pelo HD
+            cs.setString(12,itemCall.getProblem()); //  - pegar pelo HD
+            cs.setString(13, null); // Agrupamento de categorias
+            cs.setString(14, itemCall.getPriority()); //priority=>Prioridade do chamado. Se for omitido é assumido o default do AutoReq.
+            cs.setString(15, itemCall.getStatus()); // Status do chamado=>Se for omitido é assumido o default do AutoReq.
+            cs.setString(16, itemCall.getReqType()); // Tipo do chamado. Se for omitido é assumido o default do AutoReq.
+            cs.setString(17, itemCall.getResumo()); // Resumo do chamado.Se for omitido é assumido a concatenação da C:P:P:P.=>chamado.getResumo()
+            cs.setString(18, itemCall.getDescript()); // Descrição do chamado - devemos montar  
+            cs.setString(19, null);//Contato.
+            cs.setString(20, null);//Localização. Se for omitido é assumido o do cliente solicitante.
+            cs.setString(21, null);//Departamento. Se for omitido é assumido o do cliente solicitante.
+            cs.setString(22, null);//Centro de Custo. Se for omitido é assumido o do cliente solicitante.
+            cs.setString(23, null);//SLA. Se for omitido é assumido o do cliente solicitante.
+            cs.setString(24, null);//Equipamento.
+            cs.setString(25, null);//Recurso.
+            cs.setString(26, null);//Projeto.
+            cs.setString(27, null);//Formulário.
+            cs.setString(28, null);//Tipo de abertura.
+            cs.setString(29, null);//Aplicação responsavel pela abertura do chamado. Se for omitido é assumido 'AUTOREQ (Procedure)'.
+            cs.setInt(30, 0);//[0]:Indica abertura de um novo chamado; [1]:Indica o fechamento de um chamado já aberto;
+            cs.execute();
+
+            //retorno se a SP foi executada corretamente
+            int retorno = cs.getInt(1);
+
+            if (retorno == 1){
+                //retorno do nº do chamado aberto
+                numChamado = cs.getString(3);
+            }
+            cs.close();
+            
+        }
+        catch (SQLException sqlEx){
+        	CF2Logger.error("[SQLException] Ocorreu um erro ao abrir chamado.ProcAlarmId: "+procAlarmId,sqlEx);
+        }
+        catch (OutOfMemoryError outErr){
+        	CF2Logger.error("[OutOfMemoryError] Ocorreu um erro ao abrir chamado.ProcAlarmId: "+procAlarmId,outErr);
+        }
+        catch (Exception ex){
+        	CF2Logger.error("[Exception] Ocorreu um erro ao abrir chamado.ProcAlarmId: "+procAlarmId,ex);
+        }
+        catch (Throwable ex){
+        	CF2Logger.error("[Throwable] Ocorreu um erro ao abrir chamado.ProcAlarmId: "+procAlarmId,ex);
+        }
+        finally{
+    		try {
+				conn.close();
+				conn = null;
+			} catch (SQLException e) {
+				CF2Logger.error("[conn.close()] Ocorreu um erro fechar conexão com o Automidia.ProcAlarmId: "+procAlarmId,e);
+			}
+        }
+        return numChamado;
+    }
